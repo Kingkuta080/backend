@@ -9,33 +9,156 @@ const { updateStudentSchema } = require('../validation/student');
  *   get:
  *     tags: [Students]
  *     summary: Get all students with their guardian information
+ *     description: Retrieves a paginated list of students with search and sorting capabilities
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: The page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           minimum: 1
+ *           maximum: 100
+ *         description: The number of items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term to filter students by firstName, lastName, or email
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [lastName, firstName, email, form, admissioNo]
+ *           default: lastName
+ *         description: Field to sort the results by
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: asc
+ *         description: Sort order (ascending or descending)
  *     responses:
  *       '200':
- *         description: A list of students with combined guardian details.
+ *         description: Successfully retrieved students list
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/StudentWithGuardian'
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Students retrieved successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     students:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/StudentWithGuardian'
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         totalStudents:
+ *                           type: integer
+ *                           description: Total number of students matching the search criteria
+ *                         totalPages:
+ *                           type: integer
+ *                           description: Total number of pages available
+ *                         currentPage:
+ *                           type: integer
+ *                           description: Current page number
+ *                         limit:
+ *                           type: integer
+ *                           description: Number of items per page
  *       '500':
  *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ *                 data:
+ *                   type: null
  */
 router.get('/', async (req, res) => {
+  const { page = 1, limit = 10, search = '', sortBy = 'lastName', sortOrder = 'asc' } = req.query;
+
   try {
-    // Correctly select all student fields (using quotes for camelCase) and guardian fields
-    const result = await pool.query(
-      `SELECT s.id, s."firstName", s."lastName", s."middleName", s."admissioNo", s.form, s.section, s.address, s.bloodgroup, s.genotype, s.religion, s.tribe, s.gender, s.dob, s.phone, s."studentImg", s.email, g.name as guardian_name, g.phone as guardian_phone, g.status as guardian_status, g.email as guardian_email, g.img as guardian_img
-       FROM students s
-       LEFT JOIN guardians g ON s.guardian_id = g.id
-       ORDER BY s."lastName", s."firstName"`
-    );
-    res.json(result.rows);
+    const offset = (page - 1) * limit;
+    const searchPattern = `%${search}%`;
+
+    // Base query
+    let query = `
+      SELECT s.id, s."firstName", s."lastName", s."middleName", s."admissioNo", s.form, s.section, s.address, s.bloodgroup, s.genotype, s.religion, s.tribe, s.gender, s.dob, s.phone, s."studentImg", s.email, g.name as guardian_name, g.phone as guardian_phone, g.status as guardian_status, g.email as guardian_email, g.img as guardian_img
+      FROM students s
+      LEFT JOIN guardians g ON s.guardian_id = g.id
+    `;
+    const queryParams = [];
+
+    // Search functionality
+    if (search) {
+      query += ` WHERE s."firstName" ILIKE $${queryParams.length + 1} OR s."lastName" ILIKE $${queryParams.length + 1} OR s.email ILIKE $${queryParams.length + 1}`;
+      queryParams.push(searchPattern);
+    }
+    
+    // Get total count for pagination
+    const countQuery = `SELECT COUNT(*) FROM (${query}) as total`;
+    const countResult = await pool.query(countQuery, queryParams);
+    const totalStudents = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.ceil(totalStudents / limit);
+
+    // Sorting functionality
+    const validSortColumns = ['lastName', 'firstName', 'email', 'form', 'admissioNo'];
+    const orderByColumn = validSortColumns.includes(sortBy) ? `s."${sortBy}"` : 's."lastName"';
+    const orderDirection = sortOrder.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    query += ` ORDER BY ${orderByColumn} ${orderDirection}`;
+
+    // Pagination
+    queryParams.push(limit, offset);
+    query += ` LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`;
+    
+    // Execute the main query
+    const result = await pool.query(query, queryParams);
+
+    res.json({
+      ok: true,
+      message: 'Students retrieved successfully',
+      data: {
+        students: result.rows,
+        pagination: {
+          totalStudents,
+          totalPages,
+          currentPage: parseInt(page, 10),
+          limit: parseInt(limit, 10)
+        }
+      }
+    });
   } catch (error) {
     console.error('Error fetching students:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({
+      ok: false,
+      message: 'Internal server error',
+      data: null
+    });
   }
 });
 
