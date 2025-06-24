@@ -5,8 +5,8 @@ const { swaggerUi, swaggerSpec } = require('./swagger');
 const cors = require('cors');
 
 app.use(cors({
-  origin: 'http://localhost:3001', // Allow your frontend
-  credentials: true                // If you're using cookies or headers
+  origin: ['http://localhost:3001', 'http://localhost:5173'],
+  credentials: true
 }));
 
 app.use(express.json());
