@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const studentsRouter = require('./routes/students');
+const scheduleRouter = require('./routes/schedules');
 const { swaggerUi, swaggerSpec } = require('./swagger');
 const cors = require('cors');
 
@@ -17,6 +18,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 const authRouter = require('./routes/auth');
 app.use('/auth', authRouter);
 app.use('/students', studentsRouter);
+app.use('/schedules', scheduleRouter);
 
 const PORT = 3000;
 app.listen(PORT, () => {
