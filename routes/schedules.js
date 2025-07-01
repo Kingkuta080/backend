@@ -218,10 +218,10 @@ router.post('/', async (req, res) => {
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
-    const { title, category, start_date, end_date, Img } = req.body;
+    const { title, category, start_date, end_date, img } = req.body;
     const result = await pool.query(
       'INSERT INTO schedules (title, category, start_date, end_date, img) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [title, category, start_date, end_date, Img || '']
+      [title, category, start_date, end_date, img || '']
     );
     res.status(201).json({ message: 'Schedule created successfully', schedule: result.rows[0] });
   } catch (error) {
@@ -284,13 +284,13 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: error.details[0].message });
     }
     const { id } = req.params;
-    const { title, category, start_date, end_date, Img } = req.body;
+    const { title, category, start_date, end_date, img } = req.body;
     const fields = [
       { name: 'title', value: title },
       { name: 'category', value: category },
       { name: 'start_date', value: start_date },
       { name: 'end_date', value: end_date },
-      { name: 'img', value: Img }
+      { name: 'img', value: img }
     ];
     const setClauses = [];
     const values = [];
