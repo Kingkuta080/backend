@@ -162,21 +162,21 @@ router.get('/', async (req, res) => {
  *               $ref: '#/components/schemas/Error'
  */
 router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
+    try {
+      const { id } = req.params;
+      const result = await pool.query(
       'SELECT * FROM schedules WHERE id = $1',
-      [id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Schedule not found' });
+        [id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Schedule not found' });
+      }
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error fetching schedule:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Error fetching schedule:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  });
 
 /**
  * @swagger
@@ -277,46 +277,46 @@ router.post('/', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/:id', async (req, res) => {
-  try {
-    const { error } = updateScheduleSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ error: error.details[0].message });
-    }
-    const { id } = req.params;
+  router.put('/:id', async (req, res) => {
+    try {
+      const { error } = updateScheduleSchema.validate(req.body);
+      if (error) {
+        return res.status(400).json({ error: error.details[0].message });
+      }
+      const { id } = req.params;
     const { title, category, start_date, end_date, img } = req.body;
-    const fields = [
+      const fields = [
       { name: 'title', value: title },
       { name: 'category', value: category },
       { name: 'start_date', value: start_date },
       { name: 'end_date', value: end_date },
       { name: 'img', value: img }
     ];
-    const setClauses = [];
-    const values = [];
-    let paramIndex = 1;
-    fields.forEach(field => {
-      if (field.value !== undefined) {
-        setClauses.push(`${field.name} = $${paramIndex++}`);
-        values.push(field.value);
-      }
-    });
-    if (setClauses.length === 0) {
+      const setClauses = [];
+      const values = [];
+      let paramIndex = 1;
+      fields.forEach(field => {
+        if (field.value !== undefined) {
+          setClauses.push(`${field.name} = $${paramIndex++}`);
+          values.push(field.value);
+        }
+      });
+      if (setClauses.length === 0) {
       return res.status(400).json({ error: 'No fields to update.' });
-    }
-    values.push(id);
+      }
+      values.push(id);
     const query = `UPDATE schedules SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
-    const result = await pool.query(query, values);
-    if (result.rows.length === 0) {
+      const result = await pool.query(query, values);
+      if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Schedule not found' });
-    }
+      }
     res.json({ message: 'Schedule updated successfully.', schedule: result.rows[0] });
-  } catch (err) {
+    } catch (err) {
     console.error('Error updating schedule:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+  
 /**
  * @swagger
  * /schedules/{id}:
@@ -367,5 +367,5 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
+  
 module.exports = router; 
